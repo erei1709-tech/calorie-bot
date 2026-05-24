@@ -1,8 +1,3 @@
-מושלם! `ANTHROPIC_API_KEY` נשמר. לחץ **"Deploy"** למעלה ובינתיים אעדכן את הקוד ב-GitHub.
-
-הנה הקוד החדש עם Claude – תעשה Ctrl+A ← Delete ← Ctrl+V ב-GitHub על `index.js`:
-
-```javascript
 const express = require('express');
 const app = express();
 app.use(express.urlencoded({ extended: true }));
