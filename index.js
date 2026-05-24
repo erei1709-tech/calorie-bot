@@ -1,9 +1,14 @@
+מושלם! `ANTHROPIC_API_KEY` נשמר. לחץ **"Deploy"** למעלה ובינתיים אעדכן את הקוד ב-GitHub.
+
+הנה הקוד החדש עם Claude – תעשה Ctrl+A ← Delete ← Ctrl+V ב-GitHub על `index.js`:
+
+```javascript
 const express = require('express');
 const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const DAILY_GOAL = 2000;
 const userLogs = {};
 
@@ -12,30 +17,29 @@ function getTodayKey() {
 }
 
 async function analyzeFood(text) {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `אתה מומחה תזונה. המשתמש אמר: "${text}"\nהחזר JSON בלבד ללא backticks:\n{"items":[{"name":"שם המאכל","calories":100}],"total":100,"note":""}`
-          }]
-        }],
-        generationConfig: { temperature: 0.1 }
-      })
-    }
-  );
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      system: 'אתה מומחה תזונה. החזר JSON בלבד ללא backticks:\n{"items":[{"name":"שם המאכל","calories":100}],"total":100,"note":""}',
+      messages: [{ role: 'user', content: text }]
+    })
+  });
 
   const data = await response.json();
-  console.log('Gemini response:', JSON.stringify(data));
+  console.log('Claude response:', JSON.stringify(data));
 
-  if (!data.candidates || !data.candidates[0]) {
-    throw new Error('No candidates: ' + JSON.stringify(data));
+  if (!data.content || !data.content[0]) {
+    throw new Error('No content: ' + JSON.stringify(data));
   }
 
-  const raw = data.candidates[0].content.parts[0].text;
+  const raw = data.content[0].text;
   console.log('Raw:', raw);
   const clean = raw.replace(/```json|```/g, '').trim();
   return JSON.parse(clean);
@@ -79,3 +83,4 @@ app.get('/', (req, res) => res.send('Calorie Bot running!'));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Running on port ${PORT}`));
+```
