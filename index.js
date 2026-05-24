@@ -11,6 +11,10 @@ function getTodayKey() {
   return new Date().toLocaleDateString('he-IL');
 }
 
+function recalcTotal(day) {
+  day.total = day.meals.reduce((sum, m) => sum + m.total, 0);
+}
+
 async function analyzeFood(text) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -47,22 +51,19 @@ app.post('/webhook', async (req, res) => {
 
   const day = userLogs[userPhone][today];
 
-  // פקודת מחק
   if (userMessage.startsWith('/מחק')) {
     const foodToDelete = userMessage.replace('/מחק', '').trim();
 
     if (!foodToDelete) {
-      // מחק ארוחה אחרונה
       if (day.meals.length === 0) {
         res.set('Content-Type', 'text/xml');
         return res.send(`<Response><Message>אין ארוחות למחוק היום.</Message></Response>`);
       }
       const deleted = day.meals.pop();
-      day.total -= deleted.total;
+      recalcTotal(day);
       res.set('Content-Type', 'text/xml');
       return res.send(`<Response><Message>מחקתי את הארוחה האחרונה (${deleted.total} קל').\nסהכ היום עכשיו: ${day.total} קל'</Message></Response>`);
     } else {
-      // מחק לפי שם
       const idx = day.meals.findIndex(m =>
         m.items.some(i => i.name.includes(foodToDelete))
       );
@@ -71,20 +72,19 @@ app.post('/webhook', async (req, res) => {
         return res.send(`<Response><Message>לא מצאתי "${foodToDelete}" ברשימת הארוחות של היום.</Message></Response>`);
       }
       const deleted = day.meals.splice(idx, 1)[0];
-      day.total -= deleted.total;
+      recalcTotal(day);
       res.set('Content-Type', 'text/xml');
       return res.send(`<Response><Message>מחקתי "${foodToDelete}" (${deleted.total} קל').\nסהכ היום עכשיו: ${day.total} קל'</Message></Response>`);
     }
   }
 
-  // פקודת סיכום
   if (userMessage === '/סיכום') {
     if (day.meals.length === 0) {
       res.set('Content-Type', 'text/xml');
       return res.send(`<Response><Message>לא תיעדת ארוחות היום עדיין.</Message></Response>`);
     }
     const lines = day.meals.map((m, i) =>
-      `ארוחה ${i + 1}: ${m.items.map(it => it.name).join(', ')} – ${m.total} קל'`
+      `ארוחה ${i + 1}: ${m.items.map(it => it.name).join(', ')} - ${m.total} קל'`
     ).join('\n');
     const left = DAILY_GOAL - day.total;
     const status = left > 0 ? `נותרו ${left} קל'` : `עברת ב-${Math.abs(left)} קל'`;
@@ -92,11 +92,10 @@ app.post('/webhook', async (req, res) => {
     return res.send(`<Response><Message>סיכום היום:\n${lines}\n\nסהכ: ${day.total} קל'\n${status}</Message></Response>`);
   }
 
-  // חישוב ארוחה רגילה
   try {
     const result = await analyzeFood(userMessage);
     day.meals.push(result);
-    day.total += result.total;
+    recalcTotal(day);
 
     const left = DAILY_GOAL - day.total;
     const itemsList = result.items.map(i => `- ${i.name}: ${i.calories} קל'`).join('\n');
