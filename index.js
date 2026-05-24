@@ -35,7 +35,6 @@ async function analyzeFood(text) {
   }
 
   const raw = data.content[0].text;
-  console.log('Raw:', raw);
   const clean = raw.replace(/```json|```/g, '').trim();
   return JSON.parse(clean);
 }
@@ -78,4 +77,3 @@ app.get('/', (req, res) => res.send('Calorie Bot running!'));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Running on port ${PORT}`));
-```
