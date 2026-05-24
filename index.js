@@ -20,23 +20,31 @@ async function analyzeFood(text) {
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `אתה מומחה תזונה. המשתמש אמר: "${text}"
-החזר JSON בלבד, ללא backticks, ללא הסברים:
-{"items":[{"name":"שם המאכל","calories":מספר}],"total":מספר,"note":"הערה קצרה אם רלוונטי או ריק"}`
+            text: `אתה מומחה תזונה. המשתמש אמר: "${text}"\nהחזר JSON בלבד ללא backticks:\n{"items":[{"name":"שם המאכל","calories":100}],"total":100,"note":""}`
           }]
         }],
         generationConfig: { temperature: 0.1 }
       })
     }
   );
+
   const data = await response.json();
+  console.log('Gemini response:', JSON.stringify(data));
+
+  if (!data.candidates || !data.candidates[0]) {
+    throw new Error('No candidates: ' + JSON.stringify(data));
+  }
+
   const raw = data.candidates[0].content.parts[0].text;
-  return JSON.parse(raw.replace(/```json|```/g, '').trim());
+  console.log('Raw:', raw);
+  const clean = raw.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
 }
 
 app.post('/webhook', async (req, res) => {
   const userMessage = req.body.Body;
   const userPhone = req.body.From;
+  console.log('Message:', userPhone, userMessage);
 
   if (!userLogs[userPhone]) userLogs[userPhone] = {};
   const today = getTodayKey();
@@ -51,23 +59,23 @@ app.post('/webhook', async (req, res) => {
     const mealsCount = userLogs[userPhone][today].meals.length;
     const left = DAILY_GOAL - dayTotal;
 
-    const itemsList = result.items.map(i => `• ${i.name}: ${i.calories} קל'`).join('\n');
+    const itemsList = result.items.map(i => `- ${i.name}: ${i.calories} קל'`).join('\n');
     const status = left > 0
-      ? `✅ נותרו ${left} קל' מתוך יעד ${DAILY_GOAL}`
-      : `⚠️ עברת את היעד ב-${Math.abs(left)} קל'`;
+      ? `נותרו ${left} קל' מיעד ${DAILY_GOAL}`
+      : `עברת את היעד ב-${Math.abs(left)} קל'`;
 
-    const reply = `🍽️ *ארוחה ${mealsCount}:*\n${itemsList}${result.note ? '\n💡 ' + result.note : ''}\n\n*סה"כ ארוחה:* ${result.total} קל'\n📊 *סה"כ היום:* ${dayTotal} קל'\n${status}`;
+    const reply = `ארוחה ${mealsCount}:\n${itemsList}${result.note ? '\n' + result.note : ''}\n\nסהכ ארוחה: ${result.total} קל'\nסהכ היום: ${dayTotal} קל'\n${status}`;
 
     res.set('Content-Type', 'text/xml');
     res.send(`<Response><Message>${reply}</Message></Response>`);
   } catch (err) {
-    console.error(err);
+    console.error('Error:', err.message);
     res.set('Content-Type', 'text/xml');
-    res.send(`<Response><Message>שגיאה בחישוב, נסה שוב 🙏</Message></Response>`);
+    res.send(`<Response><Message>שגיאה בחישוב, נסה שוב</Message></Response>`);
   }
 });
 
-app.get('/', (req, res) => res.send('Calorie Bot is running! 🥗'));
+app.get('/', (req, res) => res.send('Calorie Bot running!'));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Running on port ${PORT}`));
